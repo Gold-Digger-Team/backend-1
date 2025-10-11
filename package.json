@@ -4,18 +4,38 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "dotenv -e .env.development nodemon server.js",
+    "start": "dotenv -e .env.production node server.js",
+    "db:auth:dev": "node scripts/dbAuth.js .env.development",
+    "db:auth:prod": "node scripts/dbAuth.js .env.production",
+    "db:migrate:dev": "dotenv -e .env.development sequelize-cli db:migrate",
+    "db:migrate:prod": "dotenv -e .env.production sequelize-cli db:migrate",
+    "db:seed:dev": "dotenv -e .env.development sequelize-cli db:seed:all",
+    "db:seed:prod": "dotenv -e .env.production sequelize-cli db:seed:all",
+    "db:undo:dev": "dotenv -e .env.development sequelize-cli db:migrate:undo",
+    "db:undo:prod": "dotenv -e .env.production sequelize-cli db:migrate:undo"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "csurf": "^1.11.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
     "nodemon": "^3.1.10",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.7"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0",
+    "dotenv-cli": "^10.0.0",
+    "sequelize-cli": "^6.6.3"
   }
 }
