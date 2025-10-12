@@ -8,6 +8,7 @@ components:
       type: apiKey
       in: header
       name: X-CSRF-Token
+
   schemas:
     Error:
       type: object
@@ -15,9 +16,22 @@ components:
         error:
           type: string
           example: 'username sudah dipakai'
+
     Message:
       type: object
       properties:
         message:
           type: string
           example: 'Login sukses'
+
+    PaginationMeta:
+      type: object
+      properties:
+        page: { type: integer, example: 1 }
+        pageSize: { type: integer, example: 50 }
+        total: { type: integer, example: 123 }
+        totalPages: { type: integer, example: 3 }
+        sortBy: { type: string, example: 'submit_date' }
+        sortDir: { type: string, example: 'DESC' }
+        from: { type: string, nullable: true, example: '2025-10-01' }
+        to: { type: string, nullable: true, example: '2025-10-12' }

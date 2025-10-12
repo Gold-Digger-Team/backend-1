@@ -6,6 +6,7 @@ require('dotenv').config()
 
 const adminRoutes = require('./routes/adminRoute')
 const formSubmissionRoutes = require('./routes/formSubmissionRoute')
+const emasRoutes = require('./routes/emasRoute')
 
 const swaggerUi = require('swagger-ui-express') // ESM: import swaggerUi from 'swagger-ui-express';
 const { specs } = require('./docs/swagger') // ESM: import { specs } from './swagger.js';
@@ -64,6 +65,8 @@ app.use('/api', csrfProtection)
 app.use('/api/admin', adminRoutes) // contoh: crud admin milik kamu
 
 app.use('/api/forms', formSubmissionRoutes)
+
+app.use('/api/emas', emasRoutes)
 // CSRF error handler rapi
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
