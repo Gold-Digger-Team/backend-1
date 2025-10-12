@@ -1,0 +1,23 @@
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: 'username sudah dipakai'
+    Message:
+      type: object
+      properties:
+        message:
+          type: string
+          example: 'Login sukses'

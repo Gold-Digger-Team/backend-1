@@ -1,0 +1,10 @@
+openapi: 3.0.3
+info:
+  title: Admin Auth API
+  version: 1.0.0
+  description: Dokumentasi untuk signup admin, login, logout, dan profil.
+servers:
+  - url: http://localhost:3001
+tags:
+  - name: Auth
+  - name: Admin

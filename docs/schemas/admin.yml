@@ -1,0 +1,52 @@
+components:
+  schemas:
+    AdminCreateRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, example: 'superadmin' }
+        password: { type: string, minLength: 6, example: 'secret123' }
+
+    AdminCreateResponse:
+      type: object
+      properties:
+        message: { type: string, example: 'Admin created' }
+        data:
+          type: object
+          properties:
+            AdminID: { type: string, example: '0c7c1a2a-1c8e-4a6a-9c1c-8d9b1e2f3a4b' }
+            username: { type: string, example: 'superadmin' }
+
+    AdminListItem:
+      type: object
+      properties:
+        AdminID: { type: string, example: '0c7c1a2a-1c8e-4a6a-9c1c-8d9b1e2f3a4b' }
+        username: { type: string, example: 'superadmin' }
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, example: 'superadmin' }
+        password: { type: string, example: 'secret123' }
+
+    LoginResponse:
+      type: object
+      properties:
+        message: { type: string, example: 'Login sukses' }
+        user:
+          type: object
+          properties:
+            AdminID: { type: string, example: '0c7c1a2a-1c8e-4a6a-9c1c-8d9b1e2f3a4b' }
+            username: { type: string, example: 'superadmin' }
+
+    MeResponse:
+      type: object
+      properties:
+        user:
+          type: object
+          description: Nilai dari req.user (diisi middleware requireAuth)
+          example:
+            sub: '0c7c1a2a-1c8e-4a6a-9c1c-8d9b1e2f3a4b'
+            username: 'superadmin'
+            role: 'admin'

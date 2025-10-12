@@ -7,7 +7,7 @@ require('dotenv').config()
 const adminRoutes = require('./routes/adminRoute')
 
 const swaggerUi = require('swagger-ui-express') // ESM: import swaggerUi from 'swagger-ui-express';
-const { specs } = require('./swagger') // ESM: import { specs } from './swagger.js';
+const { specs } = require('./docs/swagger') // ESM: import { specs } from './swagger.js';
 
 const isProd = process.env.NODE_ENV === 'production'
 const app = express()
@@ -32,6 +32,25 @@ const csrfProtection = csrf({
   }
 })
 
+/**
+ * @openapi
+ * /csrf-token:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Ambil CSRF token (double-submit cookie pattern)
+ *     description: Mengembalikan token untuk dikirim pada header `X-CSRF-Token` saat request write ke /api.
+ *     responses:
+ *       200:
+ *         description: CSRF token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 csrfToken:
+ *                   type: string
+ *                   example: "abc123csrf..."
+ */
 // Endpoint ambil token (GET aman)
 app.get('/csrf-token', csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() })

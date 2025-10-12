@@ -1,16 +1,16 @@
 const bcrypt = require('bcryptjs')
-const { sequelize, Admin } = require('../models')
+const { sequelize, Admin, FormSubmission } = require('../models')
 const jwt = require('jsonwebtoken')
 
 const isProd = process.env.NODE_ENV === 'production'
 
 exports.create = async (req, res) => {
   try {
-    const { id_admin, password } = req.body
+    const { username, password } = req.body
 
     // validasi sederhana
-    if (!id_admin || !password) {
-      return res.status(400).json({ error: 'id dan password wajib diisi' })
+    if (!username || !password) {
+      return res.status(400).json({ error: 'username dan password wajib diisi' })
     }
     if (password.length < 6) {
       return res.status(400).json({ error: 'password minimal 6 karakter' })
@@ -21,20 +21,20 @@ exports.create = async (req, res) => {
 
     // simpan
     const admin = await Admin.create({
-      id: id_admin, // kolom di model kamu: "id"
+      username: username, // kolom di model kamu: "username"
       password: hashed // AdminID auto-UUID dari model
     })
 
     // jangan kirim hash ke client
-    const { AdminID, id } = admin
+    const { AdminID } = admin
     return res.status(201).json({
       message: 'Admin created',
-      data: { AdminID, id: id_admin }
+      data: { AdminID, username: username }
     })
   } catch (err) {
     // unique constraint
     if (err?.name === 'SequelizeUniqueConstraintError') {
-      return res.status(409).json({ error: 'id sudah dipakai' })
+      return res.status(409).json({ error: 'username sudah dipakai' })
     }
     console.error(err)
     return res.status(500).json({ error: 'internal server error' })
@@ -42,24 +42,24 @@ exports.create = async (req, res) => {
 }
 
 exports.list = async (_req, res) => {
-  const rows = await Admin.findAll({ attributes: ['AdminID', ['id', 'id_admin']] })
+  const rows = await Admin.findAll({ attributes: ['AdminID', ['username', 'username']] })
   res.json(rows)
 }
 
 exports.login = async (req, res) => {
   try {
-    const { id_admin, password } = req.body
-    if (!id_admin || !password) {
-      return res.status(400).json({ error: 'id & password wajib diisi' })
+    const { username, password } = req.body
+    if (!username || !password) {
+      return res.status(400).json({ error: 'username & password wajib diisi' })
     }
 
-    const admin = await Admin.findOne({ where: { id: id_admin } })
-    if (!admin) return res.status(401).json({ error: 'ID atau password salah' })
+    const admin = await Admin.findOne({ where: { username: username } })
+    if (!admin) return res.status(401).json({ error: 'username atau password salah' })
 
     const ok = await bcrypt.compare(password, admin.password || '')
-    if (!ok) return res.status(401).json({ error: 'ID atau password salah' })
+    if (!ok) return res.status(401).json({ error: 'username atau password salah' })
 
-    const payload = { sub: admin.AdminID, id_admin: admin.id, role: 'admin' }
+    const payload = { sub: admin.AdminID, username: admin.username, role: 'admin' }
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES || '1d'
     })
@@ -73,7 +73,10 @@ exports.login = async (req, res) => {
       path: '/'
     })
 
-    return res.json({ message: 'Login sukses', user: { id: admin.AdminID, id_admin: admin.id } })
+    return res.json({
+      message: 'Login sukses',
+      user: { AdminID: admin.AdminID, username: admin.username }
+    })
   } catch (e) {
     console.error(e)
     return res.status(500).json({ error: 'internal server error' })
@@ -93,4 +96,17 @@ exports.logout = async (_req, res) => {
 exports.me = async (req, res) => {
   // req.user diset oleh middleware requireAuth
   return res.json({ user: req.user })
+}
+
+exports.getFormSubmissions = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+    const rows = await FormSubmission.findAll({ order: [['order_date', 'DESC']] })
+    res.json(rows)
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: 'internal server error' })
+  }
 }

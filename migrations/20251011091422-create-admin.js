@@ -11,7 +11,7 @@ module.exports = {
         primaryKey: true,
         defaultValue: Sequelize.literal('gen_random_uuid()')
       },
-      id: { type: Sequelize.STRING, unique: true }, // id
+      username: { type: Sequelize.STRING, unique: true }, // username
       password: { type: Sequelize.STRING, allowNull: false }
     })
   },
