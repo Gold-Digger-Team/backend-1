@@ -7,6 +7,9 @@ require('dotenv').config()
 const adminRoutes = require('./routes/adminRoute')
 const formSubmissionRoutes = require('./routes/formSubmissionRoute')
 const emasRoutes = require('./routes/emasRoute')
+const rekomendasiRoutes = require('./routes/rekomendasiRoute')
+
+const { startAngsuranCron } = require('./cron/angsuranCron')
 
 const swaggerUi = require('swagger-ui-express') // ESM: import swaggerUi from 'swagger-ui-express';
 const { specs } = require('./docs/swagger') // ESM: import { specs } from './swagger.js';
@@ -67,6 +70,10 @@ app.use('/api/admin', adminRoutes) // contoh: crud admin milik kamu
 app.use('/api/forms', formSubmissionRoutes)
 
 app.use('/api/emas', emasRoutes)
+
+app.use('/api/rekomendasi', rekomendasiRoutes)
+
+app.use
 // CSRF error handler rapi
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
@@ -74,6 +81,7 @@ app.use((err, req, res, next) => {
   }
   next(err)
 })
+startAngsuranCron()
 
 // Endpoint JSON OpenAPI (opsional, berguna buat tooling/CI)
 app.get('/docs.json', (_req, res) => res.json(specs))
