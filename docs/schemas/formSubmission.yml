@@ -1,0 +1,30 @@
+components:
+  schemas:
+    FormSubmission:
+      type: object
+      properties:
+        SubmissionsID:
+          type: string
+          example: 'uuid-v4'
+        submit_date:
+          type: string
+          format: date
+          example: '2025-10-12'
+        nama:
+          type: string
+          example: 'Budi Santoso'
+        no_telepon:
+          type: string
+          example: '081234567890'
+        email:
+          type: string
+          example: 'budi@mail.com'
+        gramase_diinginkan:
+          type: integer
+          example: 10
+        tenor_diinginkan:
+          type: integer
+          example: 12
+        kuantitas_diinginkan:
+          type: integer
+          example: 2

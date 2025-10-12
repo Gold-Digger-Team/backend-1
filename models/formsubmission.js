@@ -4,7 +4,12 @@ module.exports = (sequelize, DataTypes) => {
     'FormSubmission',
     {
       SubmissionsID: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
-      order_date: { type: DataTypes.DATEONLY, allowNull: false },
+      submit_date: {
+        // ← sudah ganti nama
+        type: DataTypes.DATEONLY,
+        allowNull: false,
+        defaultValue: DataTypes.NOW // ← otomatis isi tanggal hari ini
+      },
       nama: { type: DataTypes.STRING(255) },
       no_telepon: { type: DataTypes.STRING(20) },
       email: { type: DataTypes.STRING(255) },

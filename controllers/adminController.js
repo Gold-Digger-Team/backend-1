@@ -1,8 +1,15 @@
 const bcrypt = require('bcryptjs')
 const { sequelize, Admin, FormSubmission } = require('../models')
 const jwt = require('jsonwebtoken')
-
+const { Op } = require('sequelize')
 const isProd = process.env.NODE_ENV === 'production'
+
+function csvEscape(val) {
+  if (val === null || val === undefined) return ''
+  const s = String(val).replace(/"/g, '""')
+  // jika ada koma/kutip/linebreak → bungkus dengan kutip ganda
+  return /[",\n]/.test(s) ? `"${s}"` : s
+}
 
 exports.create = async (req, res) => {
   try {
@@ -108,5 +115,72 @@ exports.getFormSubmissions = async (req, res) => {
   } catch (e) {
     console.error(e)
     res.status(500).json({ error: 'internal server error' })
+  }
+}
+
+exports.exportFormSubmissionsCsv = async (req, res) => {
+  try {
+    // pastikan admin
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
+    // (opsional) filter tanggal via query ?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
+    const { dateFrom, dateTo } = req.query
+    const where = {}
+    if (dateFrom || dateTo) {
+      where.submit_date = {}
+      if (dateFrom) where.submit_date[Op.gte] = dateFrom
+      if (dateTo) where.submit_date[Op.lte] = dateTo
+    }
+
+    const rows = await FormSubmission.findAll({
+      where,
+      order: [['submit_date', 'DESC']],
+      raw: true
+    })
+
+    // header kolom (urut sesuai kebutuhan)
+    const header = [
+      'SubmissionsID',
+      'submit_date',
+      'nama',
+      'no_telepon',
+      'email',
+      'gramase_diinginkan',
+      'tenor_diinginkan',
+      'kuantitas_diinginkan'
+    ]
+
+    const lines = []
+    lines.push(header.join(','))
+
+    for (const r of rows) {
+      lines.push(
+        [
+          csvEscape(r.SubmissionsID),
+          csvEscape(r.submit_date), // DATEONLY
+          csvEscape(r.nama),
+          csvEscape(r.no_telepon),
+          csvEscape(r.email),
+          csvEscape(r.gramase_diinginkan),
+          csvEscape(r.tenor_diinginkan),
+          csvEscape(r.kuantitas_diinginkan)
+        ].join(',')
+      )
+    }
+
+    // BOM untuk kompatibilitas Excel
+    const csv = '\uFEFF' + lines.join('\n')
+    const filename = `form_submissions-${new Date().toISOString().slice(0, 10)}.csv`
+
+    res.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`
+    })
+    return res.send(csv)
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'internal server error' })
   }
 }

@@ -151,4 +151,34 @@ router.get('/me', requireAuth, ctrl.me)
  */
 router.get('/forms', requireAuth, ctrl.getFormSubmissions)
 
+/**
+ * @openapi
+ * /api/admin/forms/export.csv:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Export semua form submission ke CSV (admin only)
+ *     description: Mengembalikan file CSV berisi semua FormSubmissions. GET **tidak** butuh CSRF.
+ *     security: [{ cookieAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: dateFrom
+ *         description: Filter mulai tanggal (YYYY-MM-DD)
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: dateTo
+ *         description: Filter sampai tanggal (YYYY-MM-DD)
+ *         schema: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: Berhasil mengunduh CSV
+ *         content:
+ *           text/csv:
+ *             schema:
+ *               type: string
+ *               example: "SubmissionsID,submit_date,nama,no_telepon,email,gramase_diinginkan,tenor_diinginkan,kuantitas_diinginkan\n..."
+ *       403:
+ *         description: Forbidden (bukan admin)
+ */
+router.get('/forms/export.csv', requireAuth, ctrl.exportFormSubmissionsCsv)
+
 module.exports = router

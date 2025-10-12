@@ -5,6 +5,7 @@ const csrf = require('csurf')
 require('dotenv').config()
 
 const adminRoutes = require('./routes/adminRoute')
+const formSubmissionRoutes = require('./routes/formSubmissionRoute')
 
 const swaggerUi = require('swagger-ui-express') // ESM: import swaggerUi from 'swagger-ui-express';
 const { specs } = require('./docs/swagger') // ESM: import { specs } from './swagger.js';
@@ -62,6 +63,7 @@ app.use('/api', csrfProtection)
 // Routes
 app.use('/api/admin', adminRoutes) // contoh: crud admin milik kamu
 
+app.use('/api/forms', formSubmissionRoutes)
 // CSRF error handler rapi
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
