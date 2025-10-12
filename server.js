@@ -5,8 +5,9 @@ const csrf = require('csurf')
 require('dotenv').config()
 
 const adminRoutes = require('./routes/adminRoute')
-const authRoutes = require('./routes/formSubmission') // <-- abaikan ini, hanya contoh placeholder
-const authRouter = require('./routes/authRoute') // <-- kita tambahkan di langkah 4
+
+const swaggerUi = require('swagger-ui-express') // ESM: import swaggerUi from 'swagger-ui-express';
+const { specs } = require('./swagger') // ESM: import { specs } from './swagger.js';
 
 const isProd = process.env.NODE_ENV === 'production'
 const app = express()
@@ -40,9 +41,7 @@ app.get('/csrf-token', csrfProtection, (req, res) => {
 app.use('/api', csrfProtection)
 
 // Routes
-app.use('/api/auth', authRouter) // <-- login/logout/me
-app.use('/api/admins', adminRoutes) // contoh: crud admin milik kamu
-// app.use('/api/emas', emasRoutes)    // dst.
+app.use('/api/admin', adminRoutes) // contoh: crud admin milik kamu
 
 // CSRF error handler rapi
 app.use((err, req, res, next) => {
@@ -51,6 +50,18 @@ app.use((err, req, res, next) => {
   }
   next(err)
 })
+
+// Endpoint JSON OpenAPI (opsional, berguna buat tooling/CI)
+app.get('/docs.json', (_req, res) => res.json(specs))
+
+// Swagger UI
+app.use(
+  '/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(specs, {
+    explorer: true
+  })
+)
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => console.log(`API running on :${PORT}`))
