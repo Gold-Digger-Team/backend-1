@@ -48,6 +48,7 @@ const requireAuth = require('../middlewares/requireAuth')
  *                 message:
  *                   type: string
  *                   example: "Form berhasil disimpan"
+ *                 email_sent: { type: boolean, example: true }
  *                 data:
  *                   $ref: '#/components/schemas/FormSubmission'
  *       400:
@@ -163,5 +164,35 @@ router.get('/', requireAuth, ctrl.getFormSubmissions)
  *         description: Forbidden (bukan admin)
  */
 router.get('/export.csv', requireAuth, ctrl.exportFormSubmissionsCsv)
+
+/**
+ * @openapi
+ * /api/forms/preview:
+ *   post:
+ *     tags: [Emas]
+ *     summary: Preview angsuran real-time berdasarkan dp_rupiah
+ *     description: POST butuh CSRF. Mengembalikan angsuran_bulanan, nominal_pembiayaan, total_angsuran.
+ *     security: [ { csrfToken: [] } ]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [gramase, tenor, dp_rupiah]
+ *             properties:
+ *               gramase: { type: integer, example: 10 }
+ *               tenor: { type: integer, example: 24 }
+ *               kuantitas: { type: integer, example: 2 }
+ *               dp_rupiah: { type: number, example: 1500000 }
+ *     responses:
+ *       200:
+ *         description: OK
+ *       400:
+ *         description: Request invalid
+ *       503:
+ *         description: Harga emas hari ini belum tersedia
+ */
+router.post('/preview', ctrl.previewAngsuran)
 
 module.exports = router

@@ -12,6 +12,8 @@ module.exports = {
       tenor: { type: Sequelize.INTEGER, allowNull: false },
       dp_pct: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 10 },
       nominal: { type: Sequelize.FLOAT, allowNull: false },
+      dp_rupiah: { type: DataTypes.FLOAT, allowNull: false },
+      angsuran_kompetitor: { type: DataTypes.FLOAT, allowNull: true },
       updated_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.fn('NOW') }
     })
 

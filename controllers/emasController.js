@@ -45,6 +45,14 @@ function toYMD(val) {
   return norm
 }
 
+// helper: YYYY-MM-DD versi Asia/Jakarta
+function todayYMDJakarta() {
+  const now = new Date()
+  const tzOffsetMs = 7 * 60 * 60 * 1000 // WIB (UTC+7) untuk date-only
+  const jkt = new Date(now.getTime() + tzOffsetMs)
+  return jkt.toISOString().slice(0, 10)
+}
+
 // Parse XLSX buffer → rows (array of objects) + errors
 function parseXlsxToRows(fileBuffer) {
   const wb = XLSX.read(fileBuffer, { type: 'buffer' })
@@ -242,4 +250,20 @@ exports.getAllEmas = async (req, res) => {
    * Sort by harga naik:
    * GET /api/emas?sortBy=harga_pergram&sortDir=ASC
    */
+}
+exports.getTodayEmas = async (req, res) => {
+  try {
+    const today = todayYMDJakarta()
+    const row = await Emas.findByPk(today, {
+      attributes: ['tanggal', 'harga_pergram', 'input_date'],
+      raw: true
+    })
+    if (!row) {
+      return res.status(404).json({ error: `Harga emas untuk ${today} belum tersedia` })
+    }
+    return res.json(row)
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'internal server error' })
+  }
 }

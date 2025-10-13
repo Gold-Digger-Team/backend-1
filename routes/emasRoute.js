@@ -115,4 +115,27 @@ router.post('/upload', requireAuth, upload.single('file'), bulkUpsertEmas)
  */
 router.get('/', emasCtrl.getAllEmas)
 
+/**
+ * @openapi
+ * /api/emas/today:
+ *   get:
+ *     tags: [Emas]
+ *     summary: Ambil harga emas hari ini (Asia/Jakarta)
+ *     description: Endpoint publik. GET tidak membutuhkan CSRF.
+ *     responses:
+ *       200:
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/EmasRecord'
+ *       404:
+ *         description: Harga hari ini belum tersedia
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get('/today', emasCtrl.getTodayEmas)
+
 module.exports = router

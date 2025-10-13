@@ -1,64 +1,124 @@
-const { FormSubmission, sequelize } = require('../models')
+// controllers/formSubmissionController.js
+const { FormSubmission } = require('../models')
 const { Op } = require('sequelize')
+const { calcByDpRupiah, todayYMDJakarta } = require('../services/angsuranCalc')
+const { sendMail } = require('../services/mailer')
+const {
+  formSubmissionSubject,
+  formSubmissionHtml,
+  formSubmissionText
+} = require('../services/emailTemplates')
 
+// --- helpers ---
 function csvEscape(val) {
   if (val === null || val === undefined) return ''
   const s = String(val).replace(/"/g, '""')
-  // jika ada koma/kutip/linebreak → bungkus dengan kutip ganda
   return /[",\n]/.test(s) ? `"${s}"` : s
 }
+const toNum = (v) => Number(v)
+const isNum = (v) => Number.isFinite(Number(v))
 
+// --- CREATE: user submit form ---
 exports.createFormSubmission = async (req, res) => {
   try {
-    const { nama, no_telepon, email, gramase_diinginkan, tenor_diinginkan, kuantitas_diinginkan } =
-      req.body
-
-    // validasi sederhana
-    if (!nama || !email) {
-      return res.status(400).json({ error: 'nama dan email wajib diisi' })
-    }
-
-    // buat tanggal submit otomatis (format YYYY-MM-DD)
-    const submit_date = new Date().toISOString().split('T')[0]
-
-    const form = await FormSubmission.create({
-      submit_date,
+    const {
       nama,
       no_telepon,
       email,
       gramase_diinginkan,
       tenor_diinginkan,
-      kuantitas_diinginkan
-    })
+      kuantitas_diinginkan,
+      dp_rupiah
+    } = req.body || {}
+
+    // validasi minimal
+    if (!email) return res.status(400).json({ error: 'email wajib diisi' })
+    const gram = toNum(gramase_diinginkan)
+    const ten = toNum(tenor_diinginkan)
+    const qty = isNum(kuantitas_diinginkan) ? toNum(kuantitas_diinginkan) : 1
+    const dp = toNum(dp_rupiah)
+
+    if (![gram, ten, dp].every(isNum) || gram <= 0 || ten <= 0 || qty <= 0) {
+      return res.status(400).json({
+        error: 'gramase_diinginkan/tenor_diinginkan/dp_rupiah/kuantitas_diinginkan invalid'
+      })
+    }
+
+    // hitung di backend (konversi dp_rupiah->dp_pct, panggil Flask, dll)
+    const { meta, result } = await calcByDpRupiah({ gramase: gram, tenor: ten, qty, dp_rupiah: dp })
+    const { harga_pergram, dp_rupiah: dpUsed /*, dp_pct*/ } = meta
+    const { angsuran_bulanan, nominal_pembiayaan, total_angsuran } = result
+
+    // simpan ke DB (snapshot angka finansial)
+    const payload = {
+      submit_date: todayYMDJakarta(),
+      nama,
+      no_telepon,
+      email,
+      gramase_diinginkan: gram,
+      tenor_diinginkan: ten,
+      kuantitas_diinginkan: qty,
+      // snapshot finansial:
+      dp_rupiah: dpUsed,
+      angsuran_bulanan,
+      harga_pergram_submit: harga_pergram,
+      // dp_pct_submit: dp_pct, // aktifkan kalau kamu tambahkan kolomnya
+      nominal_pembiayaan,
+      total_angsuran
+    }
+
+    const row = await FormSubmission.create(payload)
+
+    // kirim email (best-effort)
+    let emailSent = false
+    try {
+      await sendMail({
+        to: email,
+        subject: formSubmissionSubject(payload),
+        html: formSubmissionHtml(payload),
+        text: formSubmissionText(payload)
+      })
+      emailSent = true
+    } catch (err) {
+      console.error('Email gagal:', err?.message || err)
+    }
 
     return res.status(201).json({
       message: 'Form berhasil disimpan',
-      data: form
+      email_sent: emailSent,
+      data: row
     })
-  } catch (err) {
-    console.error(err)
+  } catch (e) {
+    console.error(e)
+    // kalau kalkulasi gagal karena harga emas belum ada, service sudah lempar message yang jelas
     return res.status(500).json({ error: 'internal server error' })
   }
 }
 
+// --- GET (admin): list dengan filter & pagination ---
 exports.getFormSubmissions = async (req, res) => {
   try {
     if (!req.user || req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Forbidden' })
     }
 
-    // Query params
     const from = req.query.from
     const to = req.query.to
     const page = Math.max(parseInt(req.query.page || '1', 10), 1)
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize || '50', 10), 1), 500)
 
+    // tambahkan kolom2 finansial baru ke daftar yang boleh di-sort
     const ALLOWED_SORT = new Set([
       'submit_date',
       'nama',
       'email',
       'gramase_diinginkan',
-      'tenor_diinginkan'
+      'tenor_diinginkan',
+      'kuantitas_diinginkan',
+      'dp_rupiah',
+      'angsuran_bulanan',
+      'nominal_pembiayaan',
+      'total_angsuran'
     ])
     const sortBy = req.query.sortBy || 'submit_date'
     const sortDir = (req.query.sortDir || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC'
@@ -99,29 +159,22 @@ exports.getFormSubmissions = async (req, res) => {
     res.status(500).json({ error: 'internal server error' })
   }
 }
+
 /**
- * Contoh pemakaian get all dengan filter, pagination, sorting:
- * Semua form submission (default 50 baris, terbaru dulu):
+Contoh:
 GET /api/admin/forms
-
-Filter berdasarkan tanggal submit:
 GET /api/admin/forms?from=2025-10-01&to=2025-10-12
-
-Pagination:
 GET /api/admin/forms?page=2&pageSize=25
-
-Urutkan berdasarkan nama:
 GET /api/admin/forms?sortBy=nama&sortDir=ASC
- */
+*/
 
+// --- EXPORT CSV (admin) ---
 exports.exportFormSubmissionsCsv = async (req, res) => {
   try {
-    // pastikan admin
     if (!req.user || req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Forbidden' })
     }
 
-    // (opsional) filter tanggal via query ?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
     const { dateFrom, dateTo } = req.query
     const where = {}
     if (dateFrom || dateTo) {
@@ -136,7 +189,7 @@ exports.exportFormSubmissionsCsv = async (req, res) => {
       raw: true
     })
 
-    // header kolom (urut sesuai kebutuhan)
+    // sertakan kolom2 finansial baru
     const header = [
       'SubmissionsID',
       'submit_date',
@@ -145,7 +198,13 @@ exports.exportFormSubmissionsCsv = async (req, res) => {
       'email',
       'gramase_diinginkan',
       'tenor_diinginkan',
-      'kuantitas_diinginkan'
+      'kuantitas_diinginkan',
+      'dp_rupiah',
+      'angsuran_bulanan',
+      'harga_pergram_submit',
+      // 'dp_pct_submit', // kalau kamu tambah kolom ini
+      'nominal_pembiayaan',
+      'total_angsuran'
     ]
 
     const lines = []
@@ -155,20 +214,25 @@ exports.exportFormSubmissionsCsv = async (req, res) => {
       lines.push(
         [
           csvEscape(r.SubmissionsID),
-          csvEscape(r.submit_date), // DATEONLY
+          csvEscape(r.submit_date),
           csvEscape(r.nama),
           csvEscape(r.no_telepon),
           csvEscape(r.email),
           csvEscape(r.gramase_diinginkan),
           csvEscape(r.tenor_diinginkan),
-          csvEscape(r.kuantitas_diinginkan)
+          csvEscape(r.kuantitas_diinginkan),
+          csvEscape(r.dp_rupiah),
+          csvEscape(r.angsuran_bulanan),
+          csvEscape(r.harga_pergram_submit),
+          // csvEscape(r.dp_pct_submit),
+          csvEscape(r.nominal_pembiayaan),
+          csvEscape(r.total_angsuran)
         ].join(',')
       )
     }
 
-    // BOM untuk kompatibilitas Excel
-    const csv = '\uFEFF' + lines.join('\n')
-    const filename = `form_submissions-${new Date().toISOString().slice(0, 10)}.csv`
+    const csv = '\uFEFF' + lines.join('\n') // BOM untuk Excel
+    const filename = `form_submissions-${todayYMDJakarta()}.csv`
 
     res.set({
       'Content-Type': 'text/csv; charset=utf-8',
@@ -178,5 +242,28 @@ exports.exportFormSubmissionsCsv = async (req, res) => {
   } catch (e) {
     console.error(e)
     return res.status(500).json({ error: 'internal server error' })
+  }
+}
+
+// --- PREVIEW (FE live) ---
+exports.previewAngsuran = async (req, res) => {
+  try {
+    const { gramase, tenor, kuantitas, dp_rupiah } = req.body || {}
+    const gram = toNum(gramase)
+    const ten = toNum(tenor)
+    const qty = isNum(kuantitas) ? toNum(kuantitas) : 1
+    const dp = toNum(dp_rupiah)
+
+    if (![gram, ten, dp].every(isNum) || gram <= 0 || ten <= 0 || qty <= 0) {
+      return res.status(400).json({ error: 'gramase/tenor/dp_rupiah/kuantitas invalid' })
+    }
+
+    const { meta, result } = await calcByDpRupiah({ gramase: gram, tenor: ten, qty, dp_rupiah: dp })
+    return res.json({ ...meta, ...result })
+  } catch (e) {
+    console.error(e)
+    const msg = e.message || 'internal server error'
+    const code = /Harga emas .* belum tersedia/.test(msg) ? 503 : 400
+    return res.status(code).json({ error: msg })
   }
 }
