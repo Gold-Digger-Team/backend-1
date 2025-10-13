@@ -14,9 +14,8 @@ function combos() {
 }
 
 function todayYMDJakarta() {
-  // ambil tanggal Asia/Jakarta sebagai YYYY-MM-DD
   const now = new Date()
-  const tzOffsetMs = 7 * 60 * 60 * 1000 // WIB +07:00 (cukup untuk date-only)
+  const tzOffsetMs = 7 * 60 * 60 * 1000
   const jkt = new Date(now.getTime() + tzOffsetMs)
   return jkt.toISOString().slice(0, 10)
 }
@@ -37,8 +36,24 @@ async function refreshAngsuranToday() {
   for (let i = 0; i < pairs.length; i += BATCH) {
     const chunk = await Promise.all(
       pairs.slice(i, i + BATCH).map(async ({ gramase, tenor }) => {
-        const nominal = await hitungAngsuranFlask({ gramase, tenor, dp_pct })
-        return { gramase, tenor, dp_pct, nominal, updated_at: now }
+        // Kirim is_percentage:true  → Flask balikin angsuran_bulanan, dp_rupiah, total_angsuran
+        const resp = await hitungAngsuranFlask({ gramase, tenor, dp_pct, is_percentage: true })
+        const angsuran_bulanan = Number(resp?.nominal_angsuran) || 0
+        const dp_rupiah = Number(resp?.dp_rp) || 0
+        const total_angsuran = Number(resp?.total_angsuran)
+        const totalSafe = Number.isFinite(total_angsuran)
+          ? total_angsuran
+          : Math.round(angsuran_bulanan * tenor + dp_rupiah)
+
+        return {
+          gramase,
+          tenor,
+          dp_pct,
+          nominal: angsuran_bulanan, // cache angsuran per bulan
+          dp_rupiah,
+          total_angsuran: totalSafe,
+          updated_at: now
+        }
       })
     )
     results.push(...chunk)
@@ -46,7 +61,7 @@ async function refreshAngsuranToday() {
 
   await sequelize.transaction(async (t) => {
     await Angsuran.bulkCreate(results, {
-      updateOnDuplicate: ['nominal', 'updated_at'],
+      updateOnDuplicate: ['nominal', 'dp_rupiah', 'total_angsuran', 'updated_at'],
       transaction: t
     })
   })
@@ -55,27 +70,23 @@ async function refreshAngsuranToday() {
 }
 
 async function get25ForToday({ warmupIfMissing = false } = {}) {
-  const rows = await Angsuran.findAll({
-    where: { dp_pct: DP_FIXED },
-    order: [
-      ['gramase', 'ASC'],
-      ['tenor', 'ASC']
-    ],
-    raw: true
-  })
+  const where = { dp_pct: DP_FIXED }
+  const order = [
+    ['gramase', 'ASC'],
+    ['tenor', 'ASC']
+  ]
+  const attrs = ['gramase', 'tenor', 'dp_pct', 'nominal', 'dp_rupiah', 'total_angsuran']
+
+  let rows = await Angsuran.findAll({ where, order, attributes: attrs, raw: true })
   if (rows.length === 25 || !warmupIfMissing) return rows
+
   await refreshAngsuranToday()
-  return Angsuran.findAll({
-    where: { dp_pct: DP_FIXED },
-    order: [
-      ['gramase', 'ASC'],
-      ['tenor', 'ASC']
-    ],
-    raw: true
-  })
+  rows = await Angsuran.findAll({ where, order, attributes: attrs, raw: true })
+  return rows
 }
 
 function toDictionary(rows) {
+  // dictionary tetap: key → angsuran bulanan
   return Object.fromEntries(rows.map((r) => [`${r.gramase}g x ${r.tenor}`, r.nominal]))
 }
 
@@ -84,11 +95,13 @@ function nearestK(target, rows, k = 3) {
     .map((r) => ({ ...r, diff: Math.abs(r.nominal - target) }))
     .sort((a, b) => a.diff - b.diff || a.nominal - b.nominal)
     .slice(0, k)
-    .map(({ gramase, tenor, nominal, diff }) => ({
+    .map(({ gramase, tenor, nominal, diff, dp_rupiah, total_angsuran }) => ({
       key: `${gramase}g x ${tenor}`,
       gramase,
       tenor,
-      nominal,
+      nominal, // angsuran per bulan
+      dp_rupiah: dp_rupiah || 0, // dari Flask yang dicache
+      total_angsuran: total_angsuran, // dari Flask (fallback sudah saat refresh)
       diff
     }))
 }

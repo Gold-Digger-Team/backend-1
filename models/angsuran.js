@@ -31,6 +31,12 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.FLOAT,
         allowNull: false
       },
+      // models/Angsuran.js
+      total_angsuran: {
+        type: DataTypes.FLOAT,
+        allowNull: true
+      },
+
       angsuran_kompetitor: {
         type: DataTypes.FLOAT,
         allowNull: true,

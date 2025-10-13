@@ -78,7 +78,7 @@ function formSubmissionText(payload) {
     `- Nominal Pembiayaan: ${rupiah(nominal_pembiayaan)}`,
     `- Total Angsuran: ${rupiah(total_angsuran)}`,
     `- DP: ${rupiah(payload.dp_rupiah)}`,
-    `- Angsuran / Bulan: ${rupiah(payload.angsuran_bulan)}`,
+    `- Angsuran / Bulan: ${rupiah(payload.angsuran_bulanan)}`,
     ``,
     `Tim kami akan segera menghubungi kamu.`
   ].join('\n')

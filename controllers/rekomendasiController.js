@@ -29,7 +29,7 @@ exports.rekomendasiCicilEmas = async (req, res) => {
       dp_pct: DP_FIXED,
       input: { penghasilan: income, pengeluaran: expense, disposable },
       risk_caps: caps,
-      dictionary: dict,
+      dictionary: dict, // { "5g x 12": angsuranBulanan, ... }
       rekomendasi: {
         konservatif: nearestK(caps.konservatif, rows, 3),
         moderat: nearestK(caps.moderat, rows, 3),
