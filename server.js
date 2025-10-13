@@ -8,6 +8,7 @@ const adminRoutes = require('./routes/adminRoute')
 const formSubmissionRoutes = require('./routes/formSubmissionRoute')
 const emasRoutes = require('./routes/emasRoute')
 const rekomendasiRoutes = require('./routes/rekomendasiRoute')
+const simulasiCilemRoutes = require('./routes/simulasiCilemRoute')
 
 const { startAngsuranCron } = require('./cron/angsuranCron')
 
@@ -72,6 +73,8 @@ app.use('/api/forms', formSubmissionRoutes)
 app.use('/api/emas', emasRoutes)
 
 app.use('/api/rekomendasi', rekomendasiRoutes)
+
+app.use('/api/simulasi', simulasiCilemRoutes)
 
 app.use
 // CSRF error handler rapi
