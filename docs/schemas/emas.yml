@@ -4,7 +4,7 @@ components:
       type: object
       properties:
         tanggal: { type: string, format: date, example: '2025-10-12' }
-        harga_pergram: { type: integer, example: 125000 }
+        harga_pergram_idr: { type: integer, example: 125000 }
         input_date: { type: string, format: date-time, example: '2025-10-12T07:12:34.000Z' }
 
     EmasUploadResult:

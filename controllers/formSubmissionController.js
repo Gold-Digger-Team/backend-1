@@ -19,6 +19,9 @@ function csvEscape(val) {
 function isNum(x) {
   return Number.isFinite(Number(x))
 }
+function itemsToSummary(items = []) {
+  return items.map((i) => `${i.gramase}g x${i.qty}`).join('; ')
+}
 function toNum(x) {
   return Number(x)
 }
@@ -96,7 +99,7 @@ exports.createFormSubmission = async (req, res) => {
         gramase_diinginkan: meta.total_gramase, // untuk email lama (ringkas)
         tenor_diinginkan: meta.tenor,
         kuantitas_diinginkan: total_keping,
-        nominal_pembiayaan: undefined, // kalau mau, bisa dihitung di Flask lalu ditampilkan
+        nominal_pembiayaan: result.total_angsuran - result.dp_rupiah, // kalau mau, bisa dihitung di Flask lalu ditampilkan
         total_angsuran: result.total_angsuran,
         dp_rupiah: result.dp_rupiah,
         angsuran_bulanan: result.angsuran_bulanan
@@ -132,23 +135,23 @@ exports.getFormSubmissions = async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' })
     }
 
-    const from = req.query.from
-    const to = req.query.to
+    const { from, to } = req.query
     const page = Math.max(parseInt(req.query.page || '1', 10), 1)
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize || '50', 10), 1), 500)
 
-    // tambahkan kolom2 finansial baru ke daftar yang boleh di-sort
+    // kolom yang valid untuk sorting (disesuaikan skema baru)
     const ALLOWED_SORT = new Set([
       'submit_date',
       'nama',
       'email',
-      'gramase_diinginkan',
       'tenor_diinginkan',
-      'kuantitas_diinginkan',
+      'dp_pct_submit',
+      'total_gramase',
+      'total_keping',
       'dp_rupiah',
       'angsuran_bulanan',
-      'nominal_pembiayaan',
-      'total_angsuran'
+      'total_angsuran',
+      'harga_pergram_submit'
     ])
     const sortBy = req.query.sortBy || 'submit_date'
     const sortDir = (req.query.sortDir || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC'
@@ -168,11 +171,23 @@ exports.getFormSubmissions = async (req, res) => {
       order: [[sortField, sortDir]],
       offset,
       limit: pageSize,
-      raw: true
+      include: [
+        { model: FormSubmissionItem, as: 'items', attributes: ['ItemID', 'gramase', 'qty'] }
+      ]
+      // raw:false agar items tetap jadi array nested
+    })
+
+    // tambahkan ringkasan items di payload (opsional)
+    const data = rows.map((r) => {
+      const json = r.toJSON()
+      return {
+        ...json,
+        items_summary: itemsToSummary(json.items)
+      }
     })
 
     res.json({
-      data: rows,
+      data,
       meta: {
         page,
         pageSize,
@@ -189,14 +204,6 @@ exports.getFormSubmissions = async (req, res) => {
     res.status(500).json({ error: 'internal server error' })
   }
 }
-
-/**
-Contoh:
-GET /api/admin/forms
-GET /api/admin/forms?from=2025-10-01&to=2025-10-12
-GET /api/admin/forms?page=2&pageSize=25
-GET /api/admin/forms?sortBy=nama&sortDir=ASC
-*/
 
 // --- EXPORT CSV (admin) ---
 exports.exportFormSubmissionsCsv = async (req, res) => {
@@ -216,47 +223,46 @@ exports.exportFormSubmissionsCsv = async (req, res) => {
     const rows = await FormSubmission.findAll({
       where,
       order: [['submit_date', 'DESC']],
-      raw: true
+      include: [{ model: FormSubmissionItem, as: 'items', attributes: ['gramase', 'qty'] }]
     })
 
-    // sertakan kolom2 finansial baru
+    // header CSV baru (tanpa kolom lama per-item)
     const header = [
       'SubmissionsID',
       'submit_date',
       'nama',
       'no_telepon',
       'email',
-      'gramase_diinginkan',
       'tenor_diinginkan',
-      'kuantitas_diinginkan',
+      'dp_pct_submit',
+      'total_gramase',
+      'total_keping',
       'dp_rupiah',
       'angsuran_bulanan',
+      'total_angsuran',
       'harga_pergram_submit',
-      // 'dp_pct_submit', // kalau kamu tambah kolom ini
-      'nominal_pembiayaan',
-      'total_angsuran'
+      'items_summary' // semicolon separated "5g x2; 10g x3"
     ]
 
-    const lines = []
-    lines.push(header.join(','))
-
+    const lines = [header.join(',')]
     for (const r of rows) {
+      const j = r.toJSON()
       lines.push(
         [
-          csvEscape(r.SubmissionsID),
-          csvEscape(r.submit_date),
-          csvEscape(r.nama),
-          csvEscape(r.no_telepon),
-          csvEscape(r.email),
-          csvEscape(r.gramase_diinginkan),
-          csvEscape(r.tenor_diinginkan),
-          csvEscape(r.kuantitas_diinginkan),
-          csvEscape(r.dp_rupiah),
-          csvEscape(r.angsuran_bulanan),
-          csvEscape(r.harga_pergram_submit),
-          // csvEscape(r.dp_pct_submit),
-          csvEscape(r.nominal_pembiayaan),
-          csvEscape(r.total_angsuran)
+          csvEscape(j.SubmissionsID),
+          csvEscape(j.submit_date),
+          csvEscape(j.nama),
+          csvEscape(j.no_telepon),
+          csvEscape(j.email),
+          csvEscape(j.tenor_diinginkan),
+          csvEscape(j.dp_pct_submit),
+          csvEscape(j.total_gramase),
+          csvEscape(j.total_keping),
+          csvEscape(j.dp_rupiah),
+          csvEscape(j.angsuran_bulanan),
+          csvEscape(j.total_angsuran),
+          csvEscape(j.harga_pergram_submit),
+          csvEscape(itemsToSummary(j.items))
         ].join(',')
       )
     }

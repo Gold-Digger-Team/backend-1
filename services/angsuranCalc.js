@@ -53,8 +53,8 @@ async function calcByDpPercentMulti({ items, tenor, dp_pct }) {
   const today = todayYMDJakarta()
   let harga_pergram = null
   try {
-    const hargaToday = await Emas.findByPk(today, { attributes: ['harga_pergram'], raw: true })
-    if (hargaToday) harga_pergram = Number(hargaToday.harga_pergram)
+    const hargaToday = await Emas.findByPk(today, { attributes: ['harga_pergram_idr'], raw: true })
+    if (hargaToday) harga_pergram = Number(hargaToday.harga_pergram_idr)
   } catch {}
 
   // panggil Flask SEKALI dengan total gramase & dp % (percent mode)
@@ -115,8 +115,8 @@ async function calcByDpRupiah({ gramase, tenor, qty = 1, dp_rupiah }) {
   const today = todayYMDJakarta()
   let harga_pergram = null
   try {
-    const hargaToday = await Emas.findByPk(today, { attributes: ['harga_pergram'], raw: true })
-    if (hargaToday) harga_pergram = Number(hargaToday.harga_pergram)
+    const hargaToday = await Emas.findByPk(today, { attributes: ['harga_pergram_idr'], raw: true })
+    if (hargaToday) harga_pergram = Number(hargaToday.harga_pergram_idr)
   } catch {}
 
   // konversi dp_rupiah -> dp_pct relatif ke total (pakai harga per gram jika ada; kalau tidak, tetap kirim dp % dari nilai dp/total_harga_emas versi Flask)

@@ -22,7 +22,7 @@ const upload = multer({
  *   post:
  *     tags: [Admin]
  *     summary: Upload harga emas harian via file XLSX (upsert by tanggal)
- *     description: File harus memiliki kolom header `tanggal` (YYYY-MM-DD) dan `harga_pergram` (number).
+ *     description: File harus memiliki kolom header `tanggal` (YYYY-MM-DD) dan `harga_pergram_idr` (number).
  *     security: [{ cookieAuth: [] }, { csrfToken: [] }]
  *     requestBody:
  *       required: true
@@ -89,7 +89,7 @@ router.post('/upload', requireAuth, upload.single('file'), bulkUpsertEmas)
  *         description: Kolom sortir
  *         schema:
  *           type: string
- *           enum: [tanggal, harga_pergram, input_date]
+ *           enum: [tanggal, harga_pergram_idr, input_date]
  *           default: tanggal
  *       - in: query
  *         name: sortDir

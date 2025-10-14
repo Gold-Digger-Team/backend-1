@@ -70,20 +70,20 @@ function buildPayload(rows) {
   rows.forEach((r, idx) => {
     const rowNo = idx + 2 // asumsi header di baris 1
     const tanggal = toYMD(r.tanggal)
-    const harga = r.harga_pergram
+    const harga = r.harga_pergram_idr
 
     if (!tanggal) {
       errors.push(`Baris ${rowNo}: kolom "tanggal" tidak valid (YYYY-MM-DD atau date Excel)`)
       return
     }
     if (harga === null || harga === undefined || isNaN(Number(harga))) {
-      errors.push(`Baris ${rowNo}: kolom "harga_pergram" harus angka`)
+      errors.push(`Baris ${rowNo}: kolom "harga_pergram_idr" harus angka`)
       return
     }
 
     payload.push({
       tanggal,
-      harga_pergram: Math.round(Number(harga)),
+      harga_pergram_idr: Math.round(Number(harga)),
       input_date: new Date() // cap waktu upload
     })
   })
@@ -159,7 +159,7 @@ exports.bulkUpsertEmas = async (req, res) => {
     // Eksekusi: UPSERT (atau INSERT-only saat SKIP)
     await sequelize.transaction(async (t) => {
       await Emas.bulkCreate(dataToProcess, {
-        updateOnDuplicate: MODE === MODES.UPSERT ? ['harga_pergram', 'input_date'] : [],
+        updateOnDuplicate: MODE === MODES.UPSERT ? ['harga_pergram_idr', 'input_date'] : [],
         transaction: t
       })
     })
@@ -194,7 +194,7 @@ exports.getAllEmas = async (req, res) => {
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize || '100', 10), 1), 500)
 
     // whitelist kolom sortable
-    const ALLOWED_SORT = new Set(['tanggal', 'harga_pergram', 'input_date'])
+    const ALLOWED_SORT = new Set(['tanggal', 'harga_pergram_idr', 'input_date'])
     const sortBy = req.query.sortBy || 'tanggal'
     const sortDir = (req.query.sortDir || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC'
     const sortField = ALLOWED_SORT.has(sortBy) ? sortBy : 'tanggal'
@@ -211,7 +211,7 @@ exports.getAllEmas = async (req, res) => {
 
     const { rows, count } = await Emas.findAndCountAll({
       where,
-      attributes: ['tanggal', 'harga_pergram', 'input_date'],
+      attributes: ['tanggal', 'harga_pergram_idr', 'input_date'],
       order: [[sortField, sortDir]],
       offset,
       limit: pageSize,
@@ -248,14 +248,14 @@ exports.getAllEmas = async (req, res) => {
    * GET /api/emas?page=2&pageSize=50
 
    * Sort by harga naik:
-   * GET /api/emas?sortBy=harga_pergram&sortDir=ASC
+   * GET /api/emas?sortBy=harga_pergram_idr&sortDir=ASC
    */
 }
 exports.getTodayEmas = async (req, res) => {
   try {
     const today = todayYMDJakarta()
     const row = await Emas.findByPk(today, {
-      attributes: ['tanggal', 'harga_pergram', 'input_date'],
+      attributes: ['tanggal', 'harga_pergram_idr', 'input_date'],
       raw: true
     })
     if (!row) {

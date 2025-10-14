@@ -39,11 +39,6 @@ Thumbs.db
 /scripts/*.js~
 /*.sqlite
 
-# Docker
-Dockerfile
-docker-compose.yml
-docker-compose.dev.yml
-.dockerignore
 
 # Build / cache
 dist/
