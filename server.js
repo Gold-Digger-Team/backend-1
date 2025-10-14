@@ -11,6 +11,10 @@ const rekomendasiRoutes = require('./routes/rekomendasiRoute')
 const simulasiCilemRoutes = require('./routes/simulasiCilemRoute')
 
 const { startAngsuranCron } = require('./cron/angsuranCron')
+const allowed = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
 
 const swaggerUi = require('swagger-ui-express') // ESM: import swaggerUi from 'swagger-ui-express';
 const { specs } = require('./docs/swagger') // ESM: import { specs } from './swagger.js';
@@ -20,10 +24,17 @@ const app = express()
 
 app.use(
   cors({
-    origin: ['http://localhost:5173', 'http://localhost:8000'],
+    origin: (origin, cb) => {
+      // allow non-browser (postman/curl) dan origin yang terdaftar
+      if (!origin || allowed.includes(origin)) return cb(null, true)
+      return cb(new Error('Not allowed by CORS'))
+    },
     credentials: true
   })
 )
+
+// kalau di belakang reverse proxy/ingress HTTPS:
+app.set('trust proxy', 1)
 
 app.use(cookieParser())
 app.use(express.json())

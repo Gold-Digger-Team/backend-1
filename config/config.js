@@ -10,7 +10,7 @@ const base = {
   logging: process.env.NODE_ENV !== 'production',
   dialectOptions:
     process.env.DB_SSL === 'true' ? { ssl: { require: true, rejectUnauthorized: false } } : {},
-  pool: { max: 10, min: 0, idle: 10000 }
+  pool: { max: 5, min: 0, idle: 10000 }
 }
 
 module.exports = {
