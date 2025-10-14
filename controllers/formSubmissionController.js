@@ -1,7 +1,8 @@
 // controllers/formSubmissionController.js
-const { FormSubmission } = require('../models')
+const { FormSubmission, FormSubmissionItem, sequelize } = require('../models')
 const { Op } = require('sequelize')
-const { calcByDpRupiah, todayYMDJakarta } = require('../services/angsuranCalc')
+const { calcByDpPercentMulti, todayYMDJakarta } = require('../services/angsuranCalc')
+
 const { sendMail } = require('../services/mailer')
 const {
   formSubmissionSubject,
@@ -15,68 +16,96 @@ function csvEscape(val) {
   const s = String(val).replace(/"/g, '""')
   return /[",\n]/.test(s) ? `"${s}"` : s
 }
-const toNum = (v) => Number(v)
-const isNum = (v) => Number.isFinite(Number(v))
+function isNum(x) {
+  return Number.isFinite(Number(x))
+}
+function toNum(x) {
+  return Number(x)
+}
 
 // --- CREATE: user submit form ---
+// controllers/formSubmissionController.js (create)
+
+// helper num
+
 exports.createFormSubmission = async (req, res) => {
   try {
-    const {
-      nama,
-      no_telepon,
-      email,
-      gramase_diinginkan,
-      tenor_diinginkan,
-      kuantitas_diinginkan,
-      dp_rupiah
-    } = req.body || {}
+    const { nama, no_telepon, email, items, tenor, dp_pct } = req.body || {}
 
-    // validasi minimal
     if (!email) return res.status(400).json({ error: 'email wajib diisi' })
-    const gram = toNum(gramase_diinginkan)
-    const ten = toNum(tenor_diinginkan)
-    const qty = isNum(kuantitas_diinginkan) ? toNum(kuantitas_diinginkan) : 1
-    const dp = toNum(dp_rupiah)
-
-    if (![gram, ten, dp].every(isNum) || gram <= 0 || ten <= 0 || qty <= 0) {
-      return res.status(400).json({
-        error: 'gramase_diinginkan/tenor_diinginkan/dp_rupiah/kuantitas_diinginkan invalid'
-      })
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items wajib array minimal 1' })
+    }
+    if (!isNum(tenor) || !isNum(dp_pct)) {
+      return res.status(400).json({ error: 'tenor/dp_pct wajib angka' })
     }
 
-    // hitung di backend (konversi dp_rupiah->dp_pct, panggil Flask, dll)
-    const { meta, result } = await calcByDpRupiah({ gramase: gram, tenor: ten, qty, dp_rupiah: dp })
-    const { harga_pergram, dp_rupiah: dpUsed /*, dp_pct*/ } = meta
-    const { angsuran_bulanan, nominal_pembiayaan, total_angsuran } = result
+    // Hitung simulasi SEKALI untuk total gramase dengan DP%
+    const { meta, result } = await calcByDpPercentMulti({
+      items,
+      tenor: toNum(tenor),
+      dp_pct: toNum(dp_pct)
+    })
 
-    // simpan ke DB (snapshot angka finansial)
-    const payload = {
-      submit_date: todayYMDJakarta(),
-      nama,
-      no_telepon,
-      email,
-      gramase_diinginkan: gram,
-      tenor_diinginkan: ten,
-      kuantitas_diinginkan: qty,
-      // snapshot finansial:
-      dp_rupiah: dpUsed,
-      angsuran_bulanan,
-      harga_pergram_submit: harga_pergram,
-      // dp_pct_submit: dp_pct, // aktifkan kalau kamu tambahkan kolomnya
-      nominal_pembiayaan,
-      total_angsuran
-    }
+    // Ringkasan
+    const total_keping = items.reduce((a, it) => a + Math.max(1, Math.floor(toNum(it.qty ?? 1))), 0)
 
-    const row = await FormSubmission.create(payload)
+    // Simpan master + detail dalam transaksi
+    const today = todayYMDJakarta()
+    let saved
+    await sequelize.transaction(async (t) => {
+      const master = await FormSubmission.create(
+        {
+          submit_date: today,
+          nama,
+          no_telepon,
+          email,
 
-    // kirim email (best-effort)
+          tenor_diinginkan: meta.tenor,
+          dp_pct_submit: meta.dp_pct,
+
+          total_gramase: meta.total_gramase,
+          total_keping,
+          harga_pergram_submit: meta.harga_pergram ?? null,
+
+          dp_rupiah: result.dp_rupiah,
+          angsuran_bulanan: result.angsuran_bulanan,
+          total_angsuran: result.total_angsuran
+        },
+        { transaction: t, returning: true }
+      )
+
+      const details = items.map((it) => ({
+        SubmissionID: master.SubmissionsID,
+        gramase: toNum(it.gramase),
+        qty: Math.max(1, Math.floor(toNum(it.qty ?? 1)))
+      }))
+
+      await FormSubmissionItem.bulkCreate(details, { transaction: t })
+      saved = master
+    })
+
+    // (opsional) kirim email ringkasan
     let emailSent = false
     try {
+      const payloadEmail = {
+        nama,
+        email,
+        no_telepon,
+        submit_date: today,
+        gramase_diinginkan: meta.total_gramase, // untuk email lama (ringkas)
+        tenor_diinginkan: meta.tenor,
+        kuantitas_diinginkan: total_keping,
+        nominal_pembiayaan: undefined, // kalau mau, bisa dihitung di Flask lalu ditampilkan
+        total_angsuran: result.total_angsuran,
+        dp_rupiah: result.dp_rupiah,
+        angsuran_bulanan: result.angsuran_bulanan
+      }
       await sendMail({
         to: email,
-        subject: formSubmissionSubject(payload),
-        html: formSubmissionHtml(payload),
-        text: formSubmissionText(payload)
+        subject: formSubmissionSubject(payloadEmail),
+        html: formSubmissionHtml(payloadEmail),
+        text: formSubmissionText(payloadEmail)
       })
       emailSent = true
     } catch (err) {
@@ -86,12 +115,13 @@ exports.createFormSubmission = async (req, res) => {
     return res.status(201).json({
       message: 'Form berhasil disimpan',
       email_sent: emailSent,
-      data: row
+      data: saved
     })
   } catch (e) {
     console.error(e)
-    // kalau kalkulasi gagal karena harga emas belum ada, service sudah lempar message yang jelas
-    return res.status(500).json({ error: 'internal server error' })
+    const msg = e.message || 'internal server error'
+    const code = /Harga emas .* belum tersedia/.test(msg) ? 503 : 400
+    return res.status(code).json({ error: msg })
   }
 }
 
@@ -248,10 +278,29 @@ exports.exportFormSubmissionsCsv = async (req, res) => {
 // --- PREVIEW (FE live) ---
 exports.previewAngsuran = async (req, res) => {
   try {
-    const { gramase, tenor, kuantitas, dp_rupiah } = req.body || {}
+    const body = req.body || {}
+
+    // ====== JALUR BARU: multi item + dp_pct ======
+    if (Array.isArray(body.items)) {
+      const tenor = toNum(body.tenor)
+      const dp_pct = toNum(body.dp_pct)
+      if (!isNum(tenor) || !isNum(dp_pct)) {
+        return res.status(400).json({ error: 'tenor/dp_pct invalid' })
+      }
+      // clamp dp_pct 10..40 di service
+      const { meta, result } = await calcByDpPercentMulti({
+        items: body.items,
+        tenor,
+        dp_pct
+      })
+      return res.json({ ...meta, ...result })
+    }
+
+    // ====== BACKWARD-COMPAT: single item + dp_rupiah ======
+    const { gramase, tenor, kuantitas, dp_rupiah } = body
     const gram = toNum(gramase)
     const ten = toNum(tenor)
-    const qty = isNum(kuantitas) ? toNum(kuantitas) : 1
+    const qty = isNum(kuantitas) ? Math.max(1, Math.floor(toNum(kuantitas))) : 1
     const dp = toNum(dp_rupiah)
 
     if (![gram, ten, dp].every(isNum) || gram <= 0 || ten <= 0 || qty <= 0) {

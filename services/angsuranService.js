@@ -1,7 +1,7 @@
 // services/angsuranService.js
+const { hitungSimulasiCilem } = require('../services/flaskClient')
 const { Angsuran, Emas, sequelize } = require('../models')
 const { Op } = require('sequelize')
-const { hitungAngsuranFlask } = require('./flaskClient')
 
 const DP_FIXED = 10
 const GRAMASE = [5, 10, 25, 50, 100]
@@ -27,7 +27,7 @@ async function isTodayPriceReady() {
 }
 
 async function refreshAngsuranToday() {
-  const dp_pct = DP_FIXED
+  const dp = DP_FIXED //dp tetap 10% dalam percent
   const pairs = combos()
   const now = new Date()
   const results = []
@@ -37,7 +37,7 @@ async function refreshAngsuranToday() {
     const chunk = await Promise.all(
       pairs.slice(i, i + BATCH).map(async ({ gramase, tenor }) => {
         // Kirim is_percentage:true  → Flask balikin angsuran_bulanan, dp_rupiah, total_angsuran
-        const resp = await hitungAngsuranFlask({ gramase, tenor, dp_pct, is_percentage: true })
+        const resp = await hitungSimulasiCilem({ gramase, tenor, dp, is_percentage: true })
         const angsuran_bulanan = Number(resp?.nominal_angsuran) || 0
         const dp_rupiah = Number(resp?.dp_rp) || 0
         const total_angsuran = Number(resp?.total_angsuran)
@@ -48,7 +48,7 @@ async function refreshAngsuranToday() {
         return {
           gramase,
           tenor,
-          dp_pct,
+          dp,
           nominal: angsuran_bulanan, // cache angsuran per bulan
           dp_rupiah,
           total_angsuran: totalSafe,
