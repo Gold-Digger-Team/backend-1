@@ -10,6 +10,9 @@ FROM base AS deps
 COPY package*.json ./
 RUN npm ci --omit=dev
 
+# copy source
+COPY . .
+
 # ---- runner ----
 FROM base AS runner
 USER node

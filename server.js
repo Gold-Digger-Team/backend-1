@@ -17,8 +17,12 @@ const allowed = (process.env.ALLOWED_ORIGINS || '')
   .filter(Boolean)
 
 const swaggerUi = require('swagger-ui-express') // ESM: import swaggerUi from 'swagger-ui-express';
-const { specs } = require('./docs/swagger') // ESM: import { specs } from './swagger.js';
-
+let specs = {}
+try {
+  specs = require(path.join(__dirname, 'docs', 'swagger')).specs
+} catch (e) {
+  console.warn('[WARN] Swagger spec not loaded:', e.message)
+}
 const isProd = process.env.NODE_ENV === 'production'
 const app = express()
 
@@ -97,17 +101,12 @@ app.use((err, req, res, next) => {
 })
 startAngsuranCron()
 
-// Endpoint JSON OpenAPI (opsional, berguna buat tooling/CI)
-app.get('/docs.json', (_req, res) => res.json(specs))
-
-// Swagger UI
-app.use(
-  '/docs',
-  swaggerUi.serve,
-  swaggerUi.setup(specs, {
-    explorer: true
-  })
-)
+if (specs && Object.keys(specs).length) {
+  app.get('/docs.json', (_req, res) => res.json(specs))
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs, { explorer: true }))
+} else {
+  app.get('/docs', (_req, res) => res.status(503).send('Docs not available'))
+}
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => console.log(`API running on :${PORT}`))
