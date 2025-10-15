@@ -84,7 +84,9 @@ const csrfBypass = (req, _res, next) => {
  *                   example: "abc123csrf..."
  */
 app.get('/csrf-token', csrfDisabled ? csrfBypass : csrfProtection, (req, res) => {
-  res.json({ csrfToken: req.csrfToken() })
+  const token = req.csrfToken()
+  console.log('[CSRF] Token generated:', token.substring(0, 10) + '...', 'Origin:', req.get('origin'))
+  res.json({ csrfToken: token })
 })
 
 // Proteksi semua endpoint write di bawah /api hanya jika CSRF aktif
@@ -104,6 +106,13 @@ app.use('/api/simulasi', simulasiCilemRoutes)
 // CSRF error handler
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
+    console.error('[CSRF] Invalid token:', {
+      method: req.method,
+      path: req.path,
+      origin: req.get('origin'),
+      csrfHeader: req.get('x-csrf-token') || req.get('csrf-token'),
+      hasCookie: !!req.cookies._csrf
+    })
     return res.status(403).json({ error: 'Invalid CSRF token' })
   }
   next(err)
