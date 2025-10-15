@@ -16,9 +16,12 @@ const sameSiteEnv = (process.env.COOKIE_SAMESITE || '').trim().toLowerCase()
 const defaultSameSite = secure ? 'none' : 'lax'
 let sameSite = sameSiteEnv || defaultSameSite
 
+// PENTING: Untuk HTTP cross-origin (beda port atau domain),
+// Chrome/Firefox akan blokir cookie dengan sameSite=none jika secure=false.
+// Solusi: gunakan sameSite=false (disable SameSite) untuk HTTP
 if (sameSite === 'none' && !secure) {
-  console.warn('[WARN] COOKIE_SAMESITE=none but secure cookies disabled; forcing sameSite=lax')
-  sameSite = 'lax'
+  console.warn('[HTTP] Using sameSite=false for HTTP cross-origin (secure=false with sameSite=none not allowed by browsers)')
+  sameSite = false  // Disable SameSite untuk HTTP
 }
 
 module.exports = {
