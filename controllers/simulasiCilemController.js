@@ -87,3 +87,25 @@ exports.getPrediksiEmas = async (req, res) => {
         return res.status(500).json({ error: 'internal server error' })
     }
 }
+
+exports.getAllPrediksiEmas = async (req, res) => {
+    try {
+        const today = new Date().toISOString().slice(0, 10);
+        const prediksi = await PrediksiEmas.findAll({
+        where: { 
+            tanggal_prediksi: today
+        },
+        order: [['tanggal_prediksi', 'DESC']],
+        });
+
+        if (!prediksi || prediksi.length === 0) {
+        return res.status(404).json({
+            error: `Data prediksi emas tidak ditemukan untuk tanggal ${today}`,
+        });
+        }
+        return res.json({ data: prediksi });
+    } catch (e) {
+        console.error(e)
+        return res.status(500).json({ error: 'internal server error' })
+    }
+}
