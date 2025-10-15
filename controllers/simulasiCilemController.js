@@ -1,5 +1,6 @@
 const { hitungSimulasiCilem } = require('../services/flaskClient')
 const { PrediksiEmas, sequelize } = require('../models')
+const { Op } = require('sequelize');
 
 
 exports.simulasiCilem = async (req, res) => {
@@ -51,6 +52,36 @@ exports.simulasiCilem = async (req, res) => {
                 profit_pct
         },
     });
+    } catch (e) {
+        console.error(e)
+        return res.status(500).json({ error: 'internal server error' })
+    }
+}
+
+exports.getPrediksiEmas = async (req, res) => {
+    try {
+        const { tahun_ke } = req.query || {}
+        // Jika tahun_ke tidak diberikan, default ke 1
+        const tk = tahun_ke ? Number(tahun_ke) : 1
+        const today = new Date().toISOString().slice(0, 10);
+        if (!Number.isFinite(tk) || tk <= 0) {
+            return res.status(400).json({ error: 'tahun_ke wajib angka > 0' })
+        }
+        const prediksi = await PrediksiEmas.findOne({
+            where: { 
+                tanggal_prediksi: { [Op.lte]: today } ,
+                tahun_ke: tk
+            },
+            order: [['tanggal_prediksi', 'DESC']],
+            limit: 30
+        });
+
+        if (!prediksi || prediksi.length === 0) {
+            return res.status(404).json({
+                error: `Data prediksi emas tidak ditemukan untuk tahun_ke ${tk}`,
+            });
+        }
+        return res.json({ data: prediksi });
     } catch (e) {
         console.error(e)
         return res.status(500).json({ error: 'internal server error' })
