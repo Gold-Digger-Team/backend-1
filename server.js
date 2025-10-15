@@ -10,9 +10,9 @@ const formSubmissionRoutes = require('./routes/formSubmissionRoute')
 const emasRoutes = require('./routes/emasRoute')
 const rekomendasiRoutes = require('./routes/rekomendasiRoute')
 const simulasiCilemRoutes = require('./routes/simulasiCilemRoute')
+const cookieOptions = require('./config/cookie')
 
 const csrfDisabled = process.env.CSRF_DISABLED === 'true'
-const isProd = process.env.NODE_ENV === 'production'
 
 const { startAngsuranCron } = require('./cron/angsuranCron')
 const allowed = (process.env.ALLOWED_ORIGINS || '')
@@ -29,6 +29,9 @@ try {
 }
 
 const app = express()
+
+console.log('[BOOT] Allowed CORS origins:', allowed.length ? allowed.join(', ') : '(empty)')
+console.log(`[BOOT] Cookie options: secure=${cookieOptions.secure} sameSite=${cookieOptions.sameSite}`)
 
 app.use(
   cors({
@@ -49,8 +52,8 @@ const csrfProtection = csrf({
   cookie: {
     key: '_csrf',
     httpOnly: true,
-    sameSite: isProd ? 'none' : 'lax',
-    secure: isProd
+    sameSite: cookieOptions.sameSite,
+    secure: cookieOptions.secure
   }
 })
 
@@ -88,7 +91,7 @@ app.get('/csrf-token', csrfDisabled ? csrfBypass : csrfProtection, (req, res) =>
 if (!csrfDisabled) {
   app.use('/api', csrfProtection)
 } else {
-  console.warn('⚠️ CSRF protection DISABLED via env (CSRF_DISABLED=true)')
+  console.warn('CSRF protection DISABLED via env (CSRF_DISABLED=true)')
 }
 
 // Routes

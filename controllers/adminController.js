@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs')
 const { Admin } = require('../models')
 const jwt = require('jsonwebtoken')
-const isProd = process.env.NODE_ENV === 'production'
+const cookieOptions = require('../config/cookie')
 
 exports.create = async (req, res) => {
   try {
@@ -66,8 +66,8 @@ exports.login = async (req, res) => {
     // Set cookie HttpOnly (penting untuk CSRF pattern)
     res.cookie('token', token, {
       httpOnly: true,
-      sameSite: isProd ? 'none' : 'lax',
-      secure: isProd,
+      sameSite: cookieOptions.sameSite,
+      secure: cookieOptions.secure,
       maxAge: 24 * 60 * 60 * 1000, // 1 hari
       path: '/'
     })
@@ -85,8 +85,8 @@ exports.login = async (req, res) => {
 exports.logout = async (_req, res) => {
   res.clearCookie('token', {
     httpOnly: true,
-    sameSite: isProd ? 'none' : 'lax',
-    secure: isProd,
+    sameSite: cookieOptions.sameSite,
+    secure: cookieOptions.secure,
     path: '/'
   })
   return res.json({ message: 'Logged out' })
