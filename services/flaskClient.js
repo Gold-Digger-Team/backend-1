@@ -16,17 +16,21 @@ async function hitungSimulasiCilem({ gramase, tenor, dp, is_percentage = true })
   const today = new Date().toISOString().split('T')[0]
   console.log("Tanggal hari ini:", today)
 
-  const latestGold = await Emas.findOne({
+  let latestGold = await Emas.findOne({
     where: { tanggal: today },
     attributes: ['harga_pergram_idr', 'tanggal']
   })
 
   if (!latestGold) {
     console.warn(`Tidak ada data emas untuk tanggal ${today}, ambil data terbaru.`)
-    hargaEmasRow = await Emas.findOne({
+    latestGold = await Emas.findOne({
       order: [['tanggal', 'DESC']],
       attributes: ['harga_pergram_idr', 'tanggal']
     })
+  }
+
+  if (!latestGold) {
+    throw new Error(`Harga emas belum tersedia untuk tanggal ${today}`)
   }
 
   const harga_emas_harian = latestGold.harga_pergram_idr
@@ -58,5 +62,3 @@ async function hitungSimulasiCilem({ gramase, tenor, dp, is_percentage = true })
 }
 
 module.exports = { hitungSimulasiCilem }
-{
-}
