@@ -1,5 +1,6 @@
 // services/flaskClient.js
 const axios = require('axios')
+const { Emas } = require('../models')
 
 const flask = axios.create({
   baseURL: process.env.FLASK_BASE_URL,
